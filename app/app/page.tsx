@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import MortgageCalculator from "@/src/components/MortgageCalculator";
 
 type Kind = "asset" | "liability";
 
@@ -565,8 +566,13 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Mortgage Refinance Calculator */}
+              {page === "Scenario Lab" && (
+                 <MortgageCalculator />
+               )}
+
               {/* Future modules */}
-              {!["Dashboard", "Accounts"].includes(page) && (
+              {!["Dashboard", "Accounts", "Scenario Lab"].includes(page) && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
                   <div className="mb-4 text-4xl">◈</div>
                   <h2 className="text-2xl font-semibold">{page}</h2>
