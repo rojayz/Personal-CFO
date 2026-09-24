@@ -124,6 +124,253 @@ function NumberField({
   );
 }
 
+type ChartPoint = {
+  month: number;
+  existing: number;
+  refinance: number;
+};
+
+type MortgageChartProps = {
+  title: string;
+  description: string;
+  points: ChartPoint[];
+  breakEvenMonth?: number | null;
+};
+
+function MortgageChart({
+  title,
+  description,
+  points,
+  breakEvenMonth,
+}: MortgageChartProps) {
+  if (points.length === 0) return null;
+
+  // SVG chart dimensions
+  const left = 88;
+  const right = 728;
+  const top = 24;
+  const bottom = 220;
+
+  const plotWidth = right - left;
+  const plotHeight = bottom - top;
+
+  const lastMonth = Math.max(
+    1,
+    points[points.length - 1].month
+  );
+
+  const maxValue = Math.max(
+    1,
+    ...points.flatMap((point) => [
+      point.existing,
+      point.refinance,
+    ])
+  );
+
+  // Add some space above the highest line.
+  const ceiling = maxValue * 1.1;
+
+  const x = (month: number) =>
+    left + (month / lastMonth) * plotWidth;
+
+  const y = (value: number) =>
+    bottom - (value / ceiling) * plotHeight;
+
+  function makeLine(
+    key: "existing" | "refinance"
+  ) {
+    return points
+      .map(
+        (point) =>
+          `${x(point.month)},${y(point[key])}`
+      )
+      .join(" ");
+  }
+
+  const compactMoney = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+
+  const showBreakEven =
+    breakEvenMonth != null &&
+    breakEvenMonth > 0 &&
+    breakEvenMonth <= lastMonth;
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <h3 className="text-xl font-semibold">
+        {title}
+      </h3>
+
+      <p className="mt-2 text-sm text-slate-500">
+        {description}
+      </p>
+
+      {/* Legend */}
+      <div className="mt-6 flex flex-wrap gap-5 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="h-1 w-7 rounded bg-slate-600" />
+          <span>Existing mortgage</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="h-1 w-7 rounded bg-emerald-600" />
+          <span>Refinance</span>
+        </div>
+
+        {showBreakEven && (
+          <div className="flex items-center gap-2">
+            <span className="h-4 border-l-2 border-dashed border-amber-500" />
+            <span>First break-even month</span>
+          </div>
+        )}
+      </div>
+
+      {/* Chart */}
+      <div className="mt-5 w-full overflow-x-auto">
+        <svg
+          viewBox="0 0 760 270"
+          className="h-auto min-w-[360px] w-full"
+          role="img"
+          aria-label={title}
+        >
+          <title>{title}</title>
+
+          {/* Horizontal gridlines and money labels */}
+          {[0, 1, 2, 3, 4].map((tick) => {
+            const value = (ceiling * tick) / 4;
+            const position = y(value);
+
+            return (
+              <g key={`y-${tick}`}>
+                <line
+                  x1={left}
+                  x2={right}
+                  y1={position}
+                  y2={position}
+                  stroke="#e2e8f0"
+                  strokeDasharray="4 4"
+                />
+
+                <text
+                  x={left - 12}
+                  y={position + 4}
+                  textAnchor="end"
+                  fill="#64748b"
+                  fontSize="12"
+                >
+                  {compactMoney(value)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Timeline labels */}
+          {[0, 1, 2, 3, 4].map((tick) => {
+            const month = (lastMonth * tick) / 4;
+            const years = month / 12;
+
+            return (
+              <text
+                key={`x-${tick}`}
+                x={x(month)}
+                y={bottom + 23}
+                textAnchor="middle"
+                fill="#64748b"
+                fontSize="12"
+              >
+                {Number(years.toFixed(1))}y
+              </text>
+            );
+          })}
+
+          {/* Existing mortgage line */}
+          <polyline
+            points={makeLine("existing")}
+            fill="none"
+            stroke="#475569"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Refinance line */}
+          <polyline
+            points={makeLine("refinance")}
+            fill="none"
+            stroke="#059669"
+            strokeWidth="3"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Break-even marker */}
+          {showBreakEven && (
+            <g>
+              <line
+                x1={x(breakEvenMonth)}
+                x2={x(breakEvenMonth)}
+                y1={top}
+                y2={bottom}
+                stroke="#d97706"
+                strokeWidth="2"
+                strokeDasharray="5 5"
+              />
+
+              <text
+                x={x(breakEvenMonth)}
+                y={top - 8}
+                textAnchor="middle"
+                fill="#b45309"
+                fontSize="12"
+                fontWeight="600"
+              >
+                Month {breakEvenMonth}
+              </text>
+            </g>
+          )}
+
+          <text
+            x={(left + right) / 2}
+            y="263"
+            textAnchor="middle"
+            fill="#64748b"
+            fontSize="12"
+          >
+            Years from today
+          </text>
+        </svg>
+      </div>
+
+      <div className="mt-4 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+        <span className="text-slate-500">
+          At the end of the selected period
+        </span>
+
+        <div className="flex flex-wrap gap-5">
+          <span>
+            Existing:{" "}
+            <strong>
+              {money(points[points.length - 1].existing)}
+            </strong>
+          </span>
+
+          <span>
+            Refinance:{" "}
+            <strong>
+              {money(points[points.length - 1].refinance)}
+            </strong>
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function MortgageCalculator() {
   // Fictional starting assumptions.
   const [balance, setBalance] = useState(390000);
@@ -259,6 +506,80 @@ export default function MortgageCalculator() {
       }
     }
   }
+
+  
+  // Generate monthly chart data for both mortgages.
+  const chartData = invalid
+    ? []
+    : Array.from(
+        { length: horizon + 1 },
+        (_, month) => {
+          // Total financing cost to date:
+          // payments + remaining debt + upfront costs
+          // minus the original outstanding principal.
+          //
+          // This equals accrued interest and
+          // refinance fees over the selected period.
+
+          const existingCost =
+            costAtMonth(
+              balance,
+              currentRate,
+              oldMonths,
+              month,
+              0
+            ) - balance;
+
+          const refinanceCost =
+            costAtMonth(
+              financedPrincipal,
+              newRate,
+              newMonths,
+              month,
+              upfrontCosts
+            ) - balance;
+
+          const existingBalance = remainingBalance(
+            balance,
+            currentRate,
+            oldMonths,
+            month
+          );
+
+          const refinanceBalance = remainingBalance(
+            financedPrincipal,
+            newRate,
+            newMonths,
+            month
+          );
+
+          return {
+            month,
+            costs: {
+              existing: Math.max(0, existingCost),
+              refinance: Math.max(0, refinanceCost),
+            },
+            balances: {
+              existing: existingBalance,
+              refinance: refinanceBalance,
+            },
+          };
+        }
+      );
+
+  const costChart: ChartPoint[] = chartData.map(
+    (point) => ({
+      month: point.month,
+      ...point.costs,
+    })
+  );
+
+  const balanceChart: ChartPoint[] = chartData.map(
+    (point) => ({
+      month: point.month,
+      ...point.balances,
+    })
+  );
 
   const scenarios = [
     {
@@ -468,6 +789,33 @@ export default function MortgageCalculator() {
                 without discounting future cash flows.
               </p>
             </div>
+          </section>
+          
+          {/* Interactive mortgage charts */}
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold">
+                Mortgage Comparison Over Time
+              </h2>
+
+              <p className="mt-2 text-slate-500">
+                Visualize how each mortgage performs
+                over your expected time in the home.
+              </p>
+            </div>
+
+            <MortgageChart
+              title="Cumulative Borrowing Costs"
+              description="Interest incurred plus refinance closing costs. Lower is better when comparing borrowing costs over the same period."
+              points={costChart}
+              breakEvenMonth={breakEvenMonth}
+            />
+
+            <MortgageChart
+              title="Remaining Mortgage Balance"
+              description="The outstanding principal on each mortgage. This amount generally must be repaid when the property is sold."
+              points={balanceChart}
+            />
           </section>
 
           {/* Comparison table */}
